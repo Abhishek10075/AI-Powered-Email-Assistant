@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import EmailGenerator from './components/EmailGenerator';
+import Inbox from './components/Inbox';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('sent');
+  const [activeTab, setActiveTab] = useState('inbox'); // Default inbox khulega
 
   return (
     <div className="flex h-screen w-screen bg-[#070a10] overflow-hidden">
@@ -12,13 +13,7 @@ export default function App() {
 
       {/* Main Right View */}
       <main className="flex-1 flex overflow-hidden">
-        {activeTab === 'sent' ? (
-          <EmailGenerator />
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-            Inbox is currently empty.
-          </div>
-        )}
+        {activeTab === 'inbox' ? <Inbox /> : <EmailGenerator />}
       </main>
     </div>
   );

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
-
+from email_reader import fetch_inbox_emails
 load_dotenv()
 
 app = FastAPI(title="SmartMail AI API")
@@ -149,3 +149,12 @@ async def send_email_endpoint(
         raise HTTPException(status_code=502, detail=f"SMTP error: {err}")
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
+
+
+@app.get("/api/emails/inbox")
+async def get_inbox_emails(limit: int = 10):
+  try:
+    emails = await run_in_threadpool(fetch_inbox_emails, limit=limit)
+    return {"success": True, "emails": emails}
+  except Exception as err:
+    raise HTTPException(status_code=500, detail=str(err))
