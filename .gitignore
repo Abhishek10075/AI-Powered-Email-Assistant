@@ -1,0 +1,22 @@
+@"
+# Environment & secrets
+.env
+*.env
+backend/.env
+
+# Python virtual environment & cache
+venv/
+backend/venv/
+__pycache__/
+backend/__pycache__/
+*.pyc
+
+# Node modules & build
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# VS Code settings
+.vscode/
+"@ | Out-File -FilePath .gitignore -Encoding utf8
