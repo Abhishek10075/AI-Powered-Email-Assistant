@@ -1,9 +1,10 @@
-"""Email reading and HTML parsing service for SmartMail AI."""
+"""Email reading, HTML sanitizing, and attachment extraction for SmartMail AI."""
 
-import os
-import imaplib
+import base64
 from email import policy
 from email.parser import BytesParser
+import imaplib
+import os
 from bs4 import BeautifulSoup
 
 IMAP_SERVER = "imap.gmail.com"
@@ -23,8 +24,8 @@ def clean_html_to_text(html_content: str) -> str:
         return html_content
 
 
-def fetch_inbox_emails(limit: int = 10):
-    """Fetch the latest emails from the Gmail inbox via IMAP."""
+def fetch_inbox_emails(limit: int = 15):
+    """Fetch latest emails along with their metadata and attachments."""
     sender_email = os.getenv("SENDER_EMAIL")
     sender_app_password = os.getenv("SENDER_APP_PASSWORD")
 
@@ -59,15 +60,29 @@ def fetch_inbox_emails(limit: int = 10):
 
             body_text = ""
             html_fallback = ""
+            attachments = []
 
             if msg.is_multipart():
                 for part in msg.walk():
                     content_type = part.get_content_type()
                     content_disposition = str(part.get("Content-Disposition", ""))
+                    filename = part.get_filename()
 
-                    if "attachment" in content_disposition:
+                    # Check agar yeh part attachment hai
+                    if "attachment" in content_disposition or filename:
+                        payload_bytes = part.get_payload(decode=True)
+                        if payload_bytes:
+                            clean_filename = filename or f"attachment_{len(attachments) + 1}"
+                            encoded_data = base64.b64encode(payload_bytes).decode("utf-8")
+                            attachments.append({
+                                "filename": clean_filename,
+                                "content_type": content_type,
+                                "size": len(payload_bytes),
+                                "data": f"data:{content_type};base64,{encoded_data}"
+                            })
                         continue
 
+                    # Text body extract karein
                     if content_type == "text/plain" and not body_text:
                         payload = part.get_payload(decode=True)
                         if payload:
@@ -94,6 +109,7 @@ def fetch_inbox_emails(limit: int = 10):
                     else:
                         body_text = decoded
 
+            # HTML clean fallback
             if not body_text and html_fallback:
                 body_text = clean_html_to_text(html_fallback)
             elif body_text and "<html" in body_text.lower():
@@ -105,6 +121,7 @@ def fetch_inbox_emails(limit: int = 10):
                 "subject": subject,
                 "date": date_,
                 "body": body_text.strip(),
+                "attachments": attachments,
             })
 
     return emails_list

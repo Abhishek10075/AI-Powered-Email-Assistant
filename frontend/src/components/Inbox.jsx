@@ -8,6 +8,10 @@ import {
   AlertCircle,
   Loader2,
   Sparkles,
+  Paperclip,
+  Download,
+  FileText,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -81,6 +85,23 @@ export default function Inbox() {
     }
   };
 
+  const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const handleDownloadAttachment = (file) => {
+    const link = document.createElement('a');
+    link.href = file.data;
+    link.download = file.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filteredEmails = emails.filter((item) => {
     const q = searchQuery.toLowerCase();
     const sender = item.from?.toLowerCase() || '';
@@ -91,6 +112,7 @@ export default function Inbox() {
 
   const selectedEmail = emails.find((item) => item.id === selectedId);
   const selectedSender = selectedEmail ? formatSender(selectedEmail.from) : null;
+  const receivedAttachments = selectedEmail?.attachments || [];
 
   return (
     <div className="inbox-container">
@@ -157,6 +179,7 @@ export default function Inbox() {
             const sender = formatSender(item.from);
             const isSelected = item.id === selectedId;
             const isUnread = !readIds.has(item.id);
+            const hasAtt = item.attachments && item.attachments.length > 0;
 
             return (
               <div
@@ -169,7 +192,10 @@ export default function Inbox() {
                     {isUnread && <span className="unread-dot" />}
                     <span className="email-sender-name">{sender.name}</span>
                   </div>
-                  <span className="email-item-date">{formatDate(item.date)}</span>
+                  <div className="flex items-center gap-1.5">
+                    {hasAtt && <Paperclip size={11} className="text-[#1f6f5c]" />}
+                    <span className="email-item-date">{formatDate(item.date)}</span>
+                  </div>
                 </div>
                 <div className="email-item-subject">{item.subject || 'No Subject'}</div>
                 <div className="email-item-snippet">
@@ -210,7 +236,46 @@ export default function Inbox() {
               </div>
 
               <div className="email-full-body">
+                {/* Text Body */}
                 <div className="email-body-text">{selectedEmail.body}</div>
+
+                {/* Received Attachments Section below body */}
+                {receivedAttachments.length > 0 && (
+                  <div className="inbox-attachments-section">
+                    <div className="inbox-att-title">
+                      <Paperclip size={14} />
+                      <span>Attachments ({receivedAttachments.length})</span>
+                    </div>
+
+                    <div className="inbox-att-grid">
+                      {receivedAttachments.map((file, idx) => (
+                        <div key={idx} className="inbox-att-card">
+                          <div className="inbox-att-icon">
+                            {file.content_type?.startsWith('image/') ? (
+                              <ImageIcon size={18} className="text-[#1f6f5c]" />
+                            ) : (
+                              <FileText size={18} className="text-[#1f6f5c]" />
+                            )}
+                          </div>
+                          <div className="inbox-att-meta">
+                            <div className="inbox-att-name" title={file.filename}>
+                              {file.filename}
+                            </div>
+                            <div className="inbox-att-size">{formatFileSize(file.size)}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadAttachment(file)}
+                            className="inbox-att-download"
+                            title="Download file"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -514,6 +579,97 @@ export default function Inbox() {
           color: #24261f;
           white-space: pre-wrap;
           word-break: break-word;
+        }
+
+        /* Received attachments section */
+        .inbox-attachments-section {
+          margin-top: 1.75rem;
+          padding-top: 1.25rem;
+          border-top: 1px solid #e2ded0;
+        }
+
+        .inbox-att-title {
+          display: flex;
+          align-items: center;
+          gap: 0.45rem;
+          font-size: 0.78125rem;
+          font-weight: 600;
+          color: #1f6f5c;
+          margin-bottom: 0.85rem;
+        }
+
+        .inbox-att-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+          gap: 0.75rem;
+        }
+
+        .inbox-att-card {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+          background: #faf8f2;
+          border: 1px solid #e2ded0;
+          border-radius: 10px;
+          padding: 0.65rem 0.75rem;
+          transition: border-color 0.15s, transform 0.1s;
+        }
+
+        .inbox-att-card:hover {
+          border-color: #1f6f5c;
+          transform: translateY(-1px);
+        }
+
+        .inbox-att-icon {
+          width: 32px;
+          height: 32px;
+          background: #e7f1ee;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .inbox-att-meta {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .inbox-att-name {
+          font-size: 0.78125rem;
+          font-weight: 500;
+          color: #24261f;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .inbox-att-size {
+          font-size: 0.6875rem;
+          color: #7f8677;
+          margin-top: 0.1rem;
+        }
+
+        .inbox-att-download {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+          border-radius: 7px;
+          background: #ffffff;
+          border: 1px solid #e2ded0;
+          color: #1f6f5c;
+          cursor: pointer;
+          transition: background 0.15s, border-color 0.15s;
+          flex-shrink: 0;
+        }
+
+        .inbox-att-download:hover {
+          background: #1f6f5c;
+          border-color: #1f6f5c;
+          color: #ffffff;
         }
 
         .inbox-state-msg {

@@ -15,44 +15,8 @@ import {
   Loader2,
 } from 'lucide-react';
 
-/**
- * ─────────────────────────────────────────────────────────────
- * API CONTRACT (build your backend to match this)
- * ─────────────────────────────────────────────────────────────
- * POST /api/generate-email
- *
- * Request JSON body — mirrors generate_email(subject, short_description, contact_details):
- *   {
- *     "subject": string,
- *     "short_description": string,
- *     "contact_details": string
- *   }
- *
- * Success response (200):
- *   { "email": string }   // the generated email body, matching response.text from Gemini
- *
- * Error response (4xx/5xx):
- *   { "error": string }   // human-readable message, optional — falls back to status text
- *   (FastAPI's default HTTPException shape is { "detail": string } — handled below too)
- * ─────────────────────────────────────────────────────────────
- *
- * Your FastAPI server runs on its own origin (e.g. http://localhost:8000), separate
- * from the React dev server, so this must be an absolute URL, not a relative path.
- *
- * If your frontend is on Vite, you can instead read this from an env var:
- *   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
- * (Create React App uses process.env.REACT_APP_API_BASE_URL instead — import.meta
- * isn't supported there.) Left as a plain constant here so it works either way.
- */
 const API_BASE_URL = 'http://localhost:8000';
 const GENERATE_EMAIL_ENDPOINT = `${API_BASE_URL}/api/generate-email`;
-
-/**
- * POST /api/send-email — multipart/form-data (not JSON), since attachments ride along.
- * Fields: to (string), subject (string), body (string), attachments (0+ files)
- * Success (200): { "success": true }
- * Error: FastAPI's { "detail": string }
- */
 const SEND_EMAIL_ENDPOINT = `${API_BASE_URL}/api/send-email`;
 
 export default function EmailGenerator() {
@@ -64,7 +28,6 @@ export default function EmailGenerator() {
   });
   const [attachments, setAttachments] = useState([]);
 
-  // status: 'idle' | 'loading' | 'success' | 'error'
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -72,8 +35,6 @@ export default function EmailGenerator() {
   const [copied, setCopied] = useState(false);
   const copyTimeout = useRef(null);
 
-  // sendStatus: 'idle' | 'sending' | 'sent' | 'error' — separate from the
-  // generation `status` above, so sending doesn't disturb the draft shown.
   const [sendStatus, setSendStatus] = useState('idle');
   const [sendErrorMessage, setSendErrorMessage] = useState('');
 
@@ -120,13 +81,9 @@ export default function EmailGenerator() {
         let message = `Request failed with status ${res.status}`;
         try {
           const errBody = await res.json();
-          // FastAPI's HTTPException returns { "detail": string }; a custom
-          // handler might return { "error": string } — support both.
           if (typeof errBody?.detail === 'string') message = errBody.detail;
           else if (typeof errBody?.error === 'string') message = errBody.error;
-        } catch (_) {
-          /* response wasn't JSON — keep default message */
-        }
+        } catch (_) {}
         throw new Error(message);
       }
 
@@ -158,9 +115,7 @@ export default function EmailGenerator() {
       setCopied(true);
       clearTimeout(copyTimeout.current);
       copyTimeout.current = setTimeout(() => setCopied(false), 1800);
-    } catch (_) {
-      /* clipboard permission denied — silently ignore */
-    }
+    } catch (_) {}
   };
 
   const handleDownload = () => {
@@ -192,7 +147,7 @@ export default function EmailGenerator() {
 
       const res = await fetch(SEND_EMAIL_ENDPOINT, {
         method: 'POST',
-        body: form, // no Content-Type header — the browser sets the multipart boundary itself
+        body: form,
       });
 
       if (!res.ok) {
@@ -201,9 +156,7 @@ export default function EmailGenerator() {
           const errBody = await res.json();
           if (typeof errBody?.detail === 'string') message = errBody.detail;
           else if (typeof errBody?.error === 'string') message = errBody.error;
-        } catch (_) {
-          /* response wasn't JSON — keep default message */
-        }
+        } catch (_) {}
         throw new Error(message);
       }
 
@@ -230,7 +183,7 @@ export default function EmailGenerator() {
           <p className="sm-tagline">Draft with AI, refine like your inbox</p>
         </div>
 
-        {/* Two-column shell */}
+        {/* Two-column layout */}
         <div className="sm-panels">
           <ComposePanel
             formData={formData}
@@ -254,6 +207,8 @@ export default function EmailGenerator() {
             sendStatus={sendStatus}
             sendErrorMessage={sendErrorMessage}
             onSend={handleSendEmail}
+            attachments={attachments}
+            onRemoveAttachment={removeAttachment}
           />
         </div>
       </div>
@@ -345,7 +300,7 @@ export default function EmailGenerator() {
           .sm-panels { grid-template-columns: minmax(0, 380px) 1fr; }
         }
 
-        /* ---------- Compose (left) ---------- */
+        /* Compose Panel */
         .sm-compose {
           background: var(--surface-2);
           border-bottom: 1px solid var(--line);
@@ -361,10 +316,7 @@ export default function EmailGenerator() {
           }
         }
 
-        .sm-compose-fields {
-          flex: 1;
-        }
-
+        .sm-compose-fields { flex: 1; }
         .sm-block + .sm-block { margin-top: 1.15rem; }
 
         .sm-block-title {
@@ -483,17 +435,16 @@ export default function EmailGenerator() {
           cursor: not-allowed;
         }
 
-        /* ---------- Preview (right) ---------- */
+        /* Preview Panel */
         .sm-preview-col {
           display: flex;
           flex-direction: column;
           min-height: 420px;
-          padding: 1.5rem 1.5rem 1.5rem;
-          background:
-            linear-gradient(var(--surface), var(--surface)) padding-box;
+          padding: 1.5rem;
+          background: linear-gradient(var(--surface), var(--surface)) padding-box;
         }
         @media (min-width: 768px) {
-          .sm-preview-col { padding: 1.75rem 2.25rem 1.75rem; }
+          .sm-preview-col { padding: 1.75rem 2.25rem; }
         }
 
         .sm-empty, .sm-loading {
@@ -595,9 +546,7 @@ export default function EmailGenerator() {
           gap: 0.6rem;
           padding: 0.5rem 0.85rem;
         }
-        .sm-letter-line + .sm-letter-line {
-          border-top: 1px solid var(--line-soft);
-        }
+        .sm-letter-line + .sm-letter-line { border-top: 1px solid var(--line-soft); }
         .sm-letter-line-label {
           font-size: 0.72rem;
           color: var(--ink-faint);
@@ -620,24 +569,91 @@ export default function EmailGenerator() {
         .sm-letter-body-wrap {
           border: 1px solid var(--line);
           border-radius: 0 0 10px 10px;
-          padding: 1.1rem 1.1rem 0.6rem;
+          padding: 1.1rem;
           flex: 1;
           display: flex;
+          flex-direction: column;
           min-height: 220px;
+          background: #ffffff;
         }
+
         .sm-letter-body {
           width: 100%;
           border: none;
           outline: none;
-          resize: none;
+          resize: vertical;
           background: transparent;
           font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
           font-size: 0.9375rem;
           line-height: 1.75;
           color: var(--ink);
+          min-height: 180px;
           flex: 1;
         }
 
+        /* Preview Attachments Section below body */
+        .sm-preview-attachments {
+          margin-top: 1rem;
+          padding-top: 0.9rem;
+          border-top: 1px dashed var(--line);
+        }
+
+        .sm-preview-att-header {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-size: 0.72rem;
+          font-weight: 600;
+          color: var(--accent);
+          margin-bottom: 0.6rem;
+        }
+
+        .sm-preview-att-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .sm-preview-att-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.45rem;
+          background: var(--surface-2);
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          padding: 0.35rem 0.6rem;
+          font-size: 0.72rem;
+          color: var(--ink);
+        }
+
+        .sm-preview-att-pill .att-name {
+          max-width: 140px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-weight: 500;
+        }
+
+        .sm-preview-att-pill .att-size {
+          font-size: 0.65rem;
+          color: var(--ink-faint);
+        }
+
+        .sm-preview-att-pill button {
+          display: inline-flex;
+          align-items: center;
+          color: var(--ink-faint);
+          padding: 1px;
+          border-radius: 999px;
+          transition: color 0.15s;
+        }
+
+        .sm-preview-att-pill button:hover {
+          color: var(--stamp);
+          background: var(--error-bg);
+        }
+
+        /* Toolbar */
         .sm-letter-toolbar {
           display: flex;
           flex-wrap: wrap;
@@ -662,6 +678,7 @@ export default function EmailGenerator() {
           border-radius: 7px;
           padding: 0.4rem 0.65rem;
           transition: border-color 0.15s ease, color 0.15s ease;
+          cursor: pointer;
         }
         .sm-tool-btn:hover { border-color: var(--accent); color: var(--accent); }
         .sm-tool-btn.copied { color: var(--success); border-color: var(--success); }
@@ -679,6 +696,7 @@ export default function EmailGenerator() {
           border-radius: 9px;
           transition: background 0.15s ease, transform 0.1s ease;
           flex-shrink: 0;
+          cursor: pointer;
         }
         .sm-send-btn:hover:not(:disabled) { background: #204a3e; }
         .sm-send-btn:active:not(:disabled) { transform: scale(0.99); }
@@ -801,7 +819,7 @@ function ComposePanel({
               <input type="file" multiple onChange={onUpload} className="hidden" />
             </label>
           </div>
-          <p className="sm-hint">Kept with your draft for reference — not sent to the AI.</p>
+          <p className="sm-hint">Attached files will be dispatched along with this email.</p>
         </div>
       </div>
 
@@ -830,8 +848,19 @@ function PreviewPanel({
   sendStatus,
   sendErrorMessage,
   onSend,
+  attachments = [],
+  onRemoveAttachment,
 }) {
   const canSend = preview.to.trim().length > 0 && preview.body.trim().length > 0 && sendStatus !== 'sending';
+
+  const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   return (
     <div className="sm-preview-col">
       {status === 'error' && (
@@ -900,6 +929,38 @@ function PreviewPanel({
               value={preview.body}
               onChange={(e) => onPreviewChange({ ...preview, body: e.target.value })}
             />
+
+            {/* Attached files displayed below email body */}
+            {attachments.length > 0 && (
+              <div className="sm-preview-attachments">
+                <div className="sm-preview-att-header">
+                  <Paperclip size={13} />
+                  <span>Attachments ({attachments.length})</span>
+                </div>
+                <div className="sm-preview-att-list">
+                  {attachments.map((file, idx) => (
+                    <div key={idx} className="sm-preview-att-pill">
+                      {file.type?.startsWith('image/') ? (
+                        <ImageIcon size={13} className="text-[#2f5d50]" />
+                      ) : (
+                        <FileText size={13} className="text-[#2f5d50]" />
+                      )}
+                      <span className="att-name" title={file.name}>
+                        {file.name}
+                      </span>
+                      <span className="att-size">({formatFileSize(file.size)})</span>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveAttachment(idx)}
+                        title="Remove file"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="sm-letter-toolbar">
@@ -921,7 +982,7 @@ function PreviewPanel({
             <button
               type="button"
               onClick={onSend}
-              disabled={!canSend}
+              disabled={canSend ? false : true}
               className="sm-send-btn"
             >
               {sendStatus === 'sending' ? (
