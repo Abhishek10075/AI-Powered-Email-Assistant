@@ -125,3 +125,23 @@ def fetch_inbox_emails(limit: int = 15):
             })
 
     return emails_list
+
+def delete_inbox_email(email_id: str):
+    """Mark an email as deleted and expunge it from the Gmail inbox."""
+    sender_email = os.getenv("SENDER_EMAIL")
+    sender_app_password = os.getenv("SENDER_APP_PASSWORD")
+
+    if not sender_email or not sender_app_password:
+        raise ValueError("SENDER_EMAIL ya SENDER_APP_PASSWORD missing hai.")
+
+    with imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT) as mail:
+        mail.login(sender_email, sender_app_password)
+        mail.select("INBOX")
+
+        # Mark message with Deleted flag and expunge
+        status, _ = mail.store(email_id, "+FLAGS", "\\Deleted")
+        if status != "OK":
+            raise RuntimeError(f"Failed to flag email ID {email_id} as deleted.")
+
+        mail.expunge()
+    return True

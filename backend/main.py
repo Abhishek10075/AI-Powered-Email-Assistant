@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
+from email_reader import fetch_inbox_emails, delete_inbox_email
 
 load_dotenv()
 
@@ -162,4 +163,13 @@ async def get_inbox_emails(limit: int = 10):
         return {"success": True, "emails": emails}
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err)) from err
-    
+
+
+@app.delete("/api/emails/inbox/{email_id}")
+async def delete_email_endpoint(email_id: str):
+    """Endpoint to permanently delete an email from inbox."""
+    try:
+        await run_in_threadpool(delete_inbox_email, email_id=email_id)
+        return {"success": True, "message": f"Email {email_id} deleted successfully."}
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err

@@ -12,18 +12,22 @@ import {
   Download,
   FileText,
   Image as ImageIcon,
+  Reply,
+  Forward,
+  Trash2,
 } from 'lucide-react';
 
 const API_BASE_URL = 'http://localhost:8000';
 const INBOX_ENDPOINT = `${API_BASE_URL}/api/emails/inbox?limit=15`;
 
-export default function Inbox() {
+export default function Inbox({ onComposeAction }) {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [readIds, setReadIds] = useState(new Set());
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchInbox = async () => {
     setLoading(true);
@@ -55,6 +59,35 @@ export default function Inbox() {
   const handleSelectEmail = (id) => {
     setSelectedId(id);
     setReadIds((prev) => new Set([...prev, id]));
+  };
+
+  const handleDeleteEmail = async (e, id) => {
+    e.stopPropagation(); // Parent click prevent karein
+    if (deletingId) return;
+
+    setDeletingId(id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/emails/inbox/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.detail || 'Failed to delete email');
+      }
+
+      setEmails((prev) => {
+        const updated = prev.filter((item) => item.id !== id);
+        if (selectedId === id) {
+          setSelectedId(updated.length > 0 ? updated[0].id : null);
+        }
+        return updated;
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error deleting email');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const formatSender = (rawFrom) => {
@@ -113,6 +146,30 @@ export default function Inbox() {
   const selectedEmail = emails.find((item) => item.id === selectedId);
   const selectedSender = selectedEmail ? formatSender(selectedEmail.from) : null;
   const receivedAttachments = selectedEmail?.attachments || [];
+
+  const handleReply = () => {
+    if (!selectedEmail || !onComposeAction) return;
+    const currentSubject = selectedEmail.subject || 'No Subject';
+    const cleanSub = currentSubject.startsWith('Re:') ? currentSubject : `Re: ${currentSubject}`;
+
+    onComposeAction({
+      receiver: selectedSender?.email || '',
+      subject: cleanSub,
+      description: `Replying to:\n"${selectedEmail.body.slice(0, 300)}..."\n\nPlease write a professional and polite reply.`,
+    });
+  };
+
+  const handleForward = () => {
+    if (!selectedEmail || !onComposeAction) return;
+    const currentSubject = selectedEmail.subject || 'No Subject';
+    const cleanSub = currentSubject.startsWith('Fwd:') ? currentSubject : `Fwd: ${currentSubject}`;
+
+    onComposeAction({
+      receiver: '',
+      subject: cleanSub,
+      description: `Forwarding this email to a colleague:\n\n---------- Forwarded message ---------\nFrom: ${selectedEmail.from}\nDate: ${selectedEmail.date}\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.body}`,
+    });
+  };
 
   return (
     <div className="inbox-container">
@@ -180,6 +237,7 @@ export default function Inbox() {
             const isSelected = item.id === selectedId;
             const isUnread = !readIds.has(item.id);
             const hasAtt = item.attachments && item.attachments.length > 0;
+            const isDeleting = deletingId === item.id;
 
             return (
               <div
@@ -192,11 +250,28 @@ export default function Inbox() {
                     {isUnread && <span className="unread-dot" />}
                     <span className="email-sender-name">{sender.name}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+
+                  <div className="email-header-right">
                     {hasAtt && <Paperclip size={11} className="text-[#1f6f5c]" />}
                     <span className="email-item-date">{formatDate(item.date)}</span>
+
+                    {/* Delete Action on Hover */}
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={(e) => handleDeleteEmail(e, item.id)}
+                      className="email-delete-btn"
+                      title="Delete email"
+                    >
+                      {isDeleting ? (
+                        <Loader2 size={12} className="spin text-red-600" />
+                      ) : (
+                        <Trash2 size={12} />
+                      )}
+                    </button>
                   </div>
                 </div>
+
                 <div className="email-item-subject">{item.subject || 'No Subject'}</div>
                 <div className="email-item-snippet">
                   {item.body ? item.body.slice(0, 110) : 'No preview available.'}
@@ -211,9 +286,28 @@ export default function Inbox() {
           {selectedEmail ? (
             <div className="email-full-card">
               <div className="email-full-header">
-                <span className="verified-pill">
-                  <Sparkles size={12} /> Gmail Verified
-                </span>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="verified-pill">
+                    <Sparkles size={12} /> Gmail Verified
+                  </span>
+
+                  {/* Header Delete Action */}
+                  <button
+                    type="button"
+                    disabled={deletingId === selectedEmail.id}
+                    onClick={(e) => handleDeleteEmail(e, selectedEmail.id)}
+                    className="email-header-delete-btn"
+                    title="Delete this message"
+                  >
+                    {deletingId === selectedEmail.id ? (
+                      <Loader2 size={13} className="spin" />
+                    ) : (
+                      <Trash2 size={13} />
+                    )}
+                    <span>Delete</span>
+                  </button>
+                </div>
+
                 <h2 className="email-full-subject">{selectedEmail.subject || 'No Subject'}</h2>
 
                 <div className="email-meta-bar">
@@ -239,7 +333,7 @@ export default function Inbox() {
                 {/* Text Body */}
                 <div className="email-body-text">{selectedEmail.body}</div>
 
-                {/* Received Attachments Section below body */}
+                {/* Attachments Section */}
                 {receivedAttachments.length > 0 && (
                   <div className="inbox-attachments-section">
                     <div className="inbox-att-title">
@@ -276,6 +370,26 @@ export default function Inbox() {
                     </div>
                   </div>
                 )}
+
+                {/* Reply and Forward Action Bar */}
+                <div className="inbox-actions-bar">
+                  <button
+                    type="button"
+                    onClick={handleReply}
+                    className="inbox-action-btn"
+                  >
+                    <Reply size={14} />
+                    <span>Reply</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleForward}
+                    className="inbox-action-btn"
+                  >
+                    <Forward size={14} />
+                    <span>Forward</span>
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -404,6 +518,7 @@ export default function Inbox() {
         }
 
         .email-item {
+          position: relative;
           padding: 0.85rem 1rem;
           border-bottom: 1px solid #eae6da;
           cursor: pointer;
@@ -451,10 +566,57 @@ export default function Inbox() {
           font-weight: 700;
         }
 
+        .email-header-right {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
         .email-item-date {
           font-size: 0.6875rem;
           color: #9ea194;
           white-space: nowrap;
+        }
+
+        .email-delete-btn {
+          display: none;
+          background: transparent;
+          border: none;
+          color: #9ea194;
+          cursor: pointer;
+          padding: 2px 4px;
+          border-radius: 4px;
+          transition: color 0.15s, background 0.15s;
+        }
+
+        .email-item:hover .email-delete-btn {
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .email-delete-btn:hover {
+          color: #b73822;
+          background: #fbece8;
+        }
+
+        .email-header-delete-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          background: transparent;
+          border: 1px solid #eeccc0;
+          color: #ad4632;
+          border-radius: 7px;
+          padding: 0.25rem 0.55rem;
+          font-size: 0.72rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .email-header-delete-btn:hover {
+          background: #fbece8;
+          border-color: #ad4632;
         }
 
         .email-item-subject {
@@ -501,7 +663,6 @@ export default function Inbox() {
           font-weight: 600;
           padding: 0.2rem 0.5rem;
           border-radius: 999px;
-          margin-bottom: 0.75rem;
         }
 
         .email-full-subject {
@@ -581,7 +742,6 @@ export default function Inbox() {
           word-break: break-word;
         }
 
-        /* Received attachments section */
         .inbox-attachments-section {
           margin-top: 1.75rem;
           padding-top: 1.25rem;
@@ -670,6 +830,37 @@ export default function Inbox() {
           background: #1f6f5c;
           border-color: #1f6f5c;
           color: #ffffff;
+        }
+
+        .inbox-actions-bar {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          margin-top: 1.5rem;
+          padding-top: 1.25rem;
+          border-top: 1px solid #e2ded0;
+        }
+
+        .inbox-action-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.45rem;
+          padding: 0.5rem 0.95rem;
+          border-radius: 8px;
+          border: 1px solid #e2ded0;
+          background: #faf8f2;
+          color: #24261f;
+          font-size: 0.78125rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .inbox-action-btn:hover {
+          border-color: #1f6f5c;
+          background: #e7f1ee;
+          color: #1f6f5c;
+          transform: translateY(-1px);
         }
 
         .inbox-state-msg {

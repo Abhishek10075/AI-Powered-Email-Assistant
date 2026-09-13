@@ -19,7 +19,7 @@ const API_BASE_URL = 'http://localhost:8000';
 const GENERATE_EMAIL_ENDPOINT = `${API_BASE_URL}/api/generate-email`;
 const SEND_EMAIL_ENDPOINT = `${API_BASE_URL}/api/send-email`;
 
-export default function EmailGenerator() {
+export default function EmailGenerator({ initialData }) {
   const [formData, setFormData] = useState({
     receiver: '',
     subject: '',
@@ -39,6 +39,25 @@ export default function EmailGenerator() {
   const [sendErrorMessage, setSendErrorMessage] = useState('');
 
   useEffect(() => () => clearTimeout(copyTimeout.current), []);
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData((prev) => ({
+        ...prev,
+        receiver: initialData.receiver ?? prev.receiver,
+        subject: initialData.subject ?? prev.subject,
+        description: initialData.description ?? prev.description,
+      }));
+      setPreview((prev) => ({
+        ...prev,
+        to: initialData.receiver ?? prev.to,
+        subject: initialData.subject ?? prev.subject,
+        body: '',
+      }));
+      setStatus('idle');
+      setSendStatus('idle');
+    }
+  }, [initialData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -591,7 +610,6 @@ export default function EmailGenerator() {
           flex: 1;
         }
 
-        /* Preview Attachments Section below body */
         .sm-preview-attachments {
           margin-top: 1rem;
           padding-top: 0.9rem;
@@ -930,7 +948,6 @@ function PreviewPanel({
               onChange={(e) => onPreviewChange({ ...preview, body: e.target.value })}
             />
 
-            {/* Attached files displayed below email body */}
             {attachments.length > 0 && (
               <div className="sm-preview-attachments">
                 <div className="sm-preview-att-header">
