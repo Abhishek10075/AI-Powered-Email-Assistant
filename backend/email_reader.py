@@ -1,8 +1,9 @@
+"""Email reading and HTML parsing service for SmartMail AI."""
+
+import os
+import imaplib
 from email import policy
 from email.parser import BytesParser
-import imaplib
-import os
-import re
 from bs4 import BeautifulSoup
 
 IMAP_SERVER = "imap.gmail.com"
@@ -13,23 +14,17 @@ def clean_html_to_text(html_content: str) -> str:
     """HTML tags, styles aur scripts hata kar clean readable text banata hai."""
     try:
         soup = BeautifulSoup(html_content, "html.parser")
-
-        # CSS styles aur javascript scripts remove karein
         for tag in soup(["script", "style", "head", "title", "meta", "[document]"]):
             tag.decompose()
-
-        # Text extract karein
         text = soup.get_text(separator="\n")
-
-        # Faltu blank lines aur extra spaces clean karein
         lines = [line.strip() for line in text.splitlines()]
-        cleaned_text = "\n".join([line for line in lines if line])
-        return cleaned_text
-    except Exception:
+        return "\n".join([line for line in lines if line])
+    except (ValueError, TypeError, AttributeError):
         return html_content
 
 
 def fetch_inbox_emails(limit: int = 10):
+    """Fetch the latest emails from the Gmail inbox via IMAP."""
     sender_email = os.getenv("SENDER_EMAIL")
     sender_app_password = os.getenv("SENDER_APP_PASSWORD")
 
@@ -65,7 +60,6 @@ def fetch_inbox_emails(limit: int = 10):
             body_text = ""
             html_fallback = ""
 
-            # Email content parse karein
             if msg.is_multipart():
                 for part in msg.walk():
                     content_type = part.get_content_type()
@@ -74,7 +68,6 @@ def fetch_inbox_emails(limit: int = 10):
                     if "attachment" in content_disposition:
                         continue
 
-                    # Pehle plain text dhoondein
                     if content_type == "text/plain" and not body_text:
                         payload = part.get_payload(decode=True)
                         if payload:
@@ -82,8 +75,6 @@ def fetch_inbox_emails(limit: int = 10):
                                 part.get_content_charset() or "utf-8",
                                 errors="ignore",
                             )
-
-                    # Agar plain text na ho toh HTML store karein
                     elif content_type == "text/html" and not html_fallback:
                         payload = part.get_payload(decode=True)
                         if payload:
@@ -103,7 +94,6 @@ def fetch_inbox_emails(limit: int = 10):
                     else:
                         body_text = decoded
 
-            # Agar sirf HTML mila toh clean text mein convert karein
             if not body_text and html_fallback:
                 body_text = clean_html_to_text(html_fallback)
             elif body_text and "<html" in body_text.lower():

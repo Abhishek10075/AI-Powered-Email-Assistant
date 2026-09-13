@@ -4,12 +4,9 @@ import {
   RefreshCw,
   Search,
   Calendar,
-  User,
-  Clock,
   Mail,
   AlertCircle,
   Loader2,
-  ChevronRight,
   Sparkles,
 } from 'lucide-react';
 
@@ -36,7 +33,6 @@ export default function Inbox() {
       const list = Array.isArray(data?.emails) ? data.emails : [];
       setEmails(list);
 
-      // Pehla email automatically select karein agar available ho
       if (list.length > 0 && !selectedId) {
         setSelectedId(list[0].id);
         setReadIds((prev) => new Set([...prev, list[0].id]));
@@ -57,7 +53,6 @@ export default function Inbox() {
     setReadIds((prev) => new Set([...prev, id]));
   };
 
-  // Helper functions clean display ke liye
   const formatSender = (rawFrom) => {
     if (!rawFrom) return { name: 'Unknown', email: '' };
     const match = rawFrom.match(/^(.*?)\s*<(.+?)>$/);
@@ -98,301 +93,458 @@ export default function Inbox() {
   const selectedSender = selectedEmail ? formatSender(selectedEmail.from) : null;
 
   return (
-    <div className="inbox-shell w-full h-full flex flex-col overflow-hidden">
-      {/* Top Header Bar */}
-      <header className="inbox-topbar flex items-center justify-between px-6 py-3 border-b">
-        <div className="flex items-center gap-2.5">
-          <span className="inbox-badge-icon">
-            <InboxIcon size={16} strokeWidth={2} />
+    <div className="inbox-container">
+      {/* Top Header */}
+      <header className="inbox-header">
+        <div className="inbox-header-title-box">
+          <span className="inbox-header-icon">
+            <InboxIcon size={16} strokeWidth={2.2} />
           </span>
-          <h1 className="inbox-title">Inbox</h1>
-          <span className="inbox-count-pill">{emails.length} messages</span>
+          <span className="inbox-header-title">Inbox</span>
+          <span className="inbox-badge">{emails.length} messages</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Search bar */}
-          <div className="inbox-search-box flex items-center gap-2 px-3 py-1.5 rounded-lg border">
-            <Search size={14} className="text-muted" />
+        <div className="inbox-header-actions">
+          <div className="inbox-search">
+            <Search size={14} color="#7f8677" />
             <input
               type="text"
-              placeholder="Search sender, subject, or message…"
+              placeholder="Search sender, subject, or message..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-52 md:w-64"
             />
           </div>
-
-          {/* Refresh Button */}
           <button
             type="button"
             onClick={fetchInbox}
             disabled={loading}
-            className="inbox-refresh-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium"
-            title="Refresh inbox"
+            className="inbox-refresh"
           >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-            <span>{loading ? 'Refreshing…' : 'Refresh'}</span>
+            <RefreshCw size={13} className={loading ? 'spin' : ''} />
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
           </button>
         </div>
       </header>
 
-      {/* Main Two-Column Layout */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
-        {/* Left Column: Email List (5 cols) */}
-        <section className="md:col-span-5 lg:col-span-4 border-r flex flex-col h-full overflow-hidden bg-white">
-          <div className="flex-1 overflow-y-auto divide-y divide-subtle">
-            {loading && emails.length === 0 && (
-              <div className="h-64 flex flex-col items-center justify-center gap-2 text-muted text-xs">
-                <Loader2 size={20} className="animate-spin text-accent" />
-                <span>Fetching latest emails from Gmail…</span>
-              </div>
-            )}
+      {/* Two Panes */}
+      <div className="inbox-split-view">
+        {/* Left List */}
+        <aside className="inbox-list-pane">
+          {loading && emails.length === 0 && (
+            <div className="inbox-state-msg">
+              <Loader2 size={20} className="spin text-accent" />
+              <span>Fetching latest emails...</span>
+            </div>
+          )}
 
-            {error && (
-              <div className="m-4 p-3.5 bg-error-soft border border-error-line text-error rounded-xl text-xs flex items-start gap-2.5">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold mb-1">Failed to read emails</p>
-                  <p className="opacity-90">{error}</p>
+          {error && (
+            <div className="inbox-error-box">
+              <AlertCircle size={16} />
+              <div>
+                <strong>Error:</strong> {error}
+              </div>
+            </div>
+          )}
+
+          {!loading && filteredEmails.length === 0 && !error && (
+            <div className="inbox-state-msg">
+              <Mail size={24} color="#9ea194" />
+              <span>No emails found</span>
+            </div>
+          )}
+
+          {filteredEmails.map((item) => {
+            const sender = formatSender(item.from);
+            const isSelected = item.id === selectedId;
+            const isUnread = !readIds.has(item.id);
+
+            return (
+              <div
+                key={item.id}
+                onClick={() => handleSelectEmail(item.id)}
+                className={`email-item ${isSelected ? 'selected' : ''} ${isUnread ? 'unread' : ''}`}
+              >
+                <div className="email-item-header">
+                  <div className="email-sender-wrap">
+                    {isUnread && <span className="unread-dot" />}
+                    <span className="email-sender-name">{sender.name}</span>
+                  </div>
+                  <span className="email-item-date">{formatDate(item.date)}</span>
+                </div>
+                <div className="email-item-subject">{item.subject || 'No Subject'}</div>
+                <div className="email-item-snippet">
+                  {item.body ? item.body.slice(0, 110) : 'No preview available.'}
                 </div>
               </div>
-            )}
+            );
+          })}
+        </aside>
 
-            {!loading && filteredEmails.length === 0 && !error && (
-              <div className="h-64 flex flex-col items-center justify-center text-muted text-xs text-center p-6">
-                <Mail size={28} className="stroke-[1.2] mb-2 opacity-50" />
-                <p className="font-medium text-ink">No emails match your query</p>
-                <p className="text-[11px] opacity-75 mt-0.5">Your primary inbox has no items to display.</p>
-              </div>
-            )}
-
-            {filteredEmails.map((item) => {
-              const sender = formatSender(item.from);
-              const isSelected = item.id === selectedId;
-              const isUnread = !readIds.has(item.id);
-
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => handleSelectEmail(item.id)}
-                  className={`email-row p-3.5 cursor-pointer transition ${
-                    isSelected
-                      ? 'email-row-active'
-                      : isUnread
-                      ? 'bg-[#fafaf7] hover:bg-[#f3f1ea]'
-                      : 'hover:bg-[#f7f6f1]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <div className="flex items-center gap-2 truncate">
-                      {isUnread && <span className="unread-dot flex-shrink-0" />}
-                      <span className={`text-xs truncate ${isUnread ? 'font-bold text-ink' : 'font-medium text-ink-soft'}`}>
-                        {sender.name}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-faint flex-shrink-0 whitespace-nowrap">
-                      {formatDate(item.date)}
-                    </span>
-                  </div>
-
-                  <div className={`text-xs truncate mb-1 ${isUnread ? 'font-semibold text-ink' : 'text-ink-soft'}`}>
-                    {item.subject || 'No Subject'}
-                  </div>
-
-                  <p className="text-[11px] text-faint line-clamp-2 leading-relaxed font-sans">
-                    {item.body ? item.body.slice(0, 140) : 'No preview available.'}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Right Column: Full Email Reading Pane (7 cols) */}
-        <section className="md:col-span-7 lg:col-span-8 flex flex-col h-full overflow-hidden bg-[#faf8f2]">
+        {/* Right Preview */}
+        <main className="inbox-preview-pane">
           {selectedEmail ? (
-            <article className="flex-1 flex flex-col h-full overflow-hidden">
-              {/* Email Content Header */}
-              <div className="p-6 md:p-8 bg-white border-b flex-shrink-0">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="status-pill">
-                    <Sparkles size={11} /> Gmail Verified
-                  </span>
-                </div>
+            <div className="email-full-card">
+              <div className="email-full-header">
+                <span className="verified-pill">
+                  <Sparkles size={12} /> Gmail Verified
+                </span>
+                <h2 className="email-full-subject">{selectedEmail.subject || 'No Subject'}</h2>
 
-                <h2 className="text-xl md:text-2xl font-serif font-bold text-ink tracking-tight mb-4">
-                  {selectedEmail.subject || 'No Subject'}
-                </h2>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-subtle text-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="avatar-circle">
-                      {selectedSender?.name ? selectedSender.name.charAt(0).toUpperCase() : 'M'}
-                    </div>
+                <div className="email-meta-bar">
+                  <div className="email-sender-info">
+                    <div className="avatar">{selectedSender?.name?.charAt(0).toUpperCase() || 'M'}</div>
                     <div>
-                      <div className="font-semibold text-ink flex items-center gap-1.5">
-                        <span>{selectedSender?.name}</span>
-                        {selectedSender?.email && (
-                          <span className="text-[11px] font-normal text-muted">
-                            &lt;{selectedSender.email}&gt;
-                          </span>
-                        )}
+                      <div className="sender-name-full">
+                        {selectedSender?.name}{' '}
+                        {selectedSender?.email && <span>&lt;{selectedSender.email}&gt;</span>}
                       </div>
-                      <div className="text-[10px] text-muted flex items-center gap-1 mt-0.5">
-                        <Clock size={11} /> Received via IMAP SSL
-                      </div>
+                      <div className="sender-sub">Received via IMAP SSL</div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-xs text-muted bg-[#f5f3ec] px-3 py-1.5 rounded-lg border">
-                    <Calendar size={12} />
+                  <div className="email-date-pill">
+                    <Calendar size={13} />
                     <span>{selectedEmail.date}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Email Content Body */}
-              <div className="flex-1 p-6 md:p-8 overflow-y-auto">
-                <div className="email-body-paper bg-white p-6 md:p-8 rounded-xl border shadow-sm">
-                  <div className="email-prose text-sm text-ink whitespace-pre-wrap leading-relaxed font-serif select-text">
-                    {selectedEmail.body || 'This message contains no readable text body.'}
-                  </div>
-                </div>
+              <div className="email-full-body">
+                <div className="email-body-text">{selectedEmail.body}</div>
               </div>
-            </article>
+            </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted">
-              <div className="w-12 h-12 rounded-2xl bg-white border flex items-center justify-center mb-3 shadow-sm">
-                <Mail size={22} className="stroke-[1.3] text-muted" />
-              </div>
-              <h3 className="text-sm font-semibold text-ink">No conversation selected</h3>
-              <p className="text-xs text-muted max-w-xs mt-1">
-                Choose an incoming message from the left to read its complete content.
-              </p>
+            <div className="inbox-state-msg">
+              <Mail size={32} color="#9ea194" />
+              <span>Select an email from the left list to read</span>
             </div>
           )}
-        </section>
+        </main>
       </div>
 
       <style>{`
-        .inbox-shell {
-          --paper: #f5f3ec;
-          --surface: #ffffff;
-          --surface-2: #faf8f2;
-          --ink: #24261f;
-          --ink-soft: #5b6270;
-          --muted: #7f8677;
-          --faint: #9ea194;
-          --line: #e2ded0;
-          --subtle: #eae6da;
-          --accent: #1f6f5c;
-          --accent-soft: #e7f1ee;
-          --stamp: #ad4632;
-          --error: #b73822;
-          --error-soft: #fbece8;
-          --error-line: #f1cfc6;
-          background: var(--surface-2);
-          color: var(--ink);
+        .inbox-container {
+          width: 100%;
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+          background: #faf8f2;
+          color: #24261f;
+          overflow: hidden;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
-        .inbox-topbar {
+        .inbox-header {
+          height: 54px;
           background: #ffffff;
-          border-color: var(--line);
+          border-bottom: 1px solid #e2ded0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 1.25rem;
+          flex-shrink: 0;
         }
 
-        .inbox-badge-icon {
-          display: inline-flex;
+        .inbox-header-title-box {
+          display: flex;
           align-items: center;
-          justify-content: center;
+          gap: 0.6rem;
+        }
+
+        .inbox-header-icon {
           width: 28px;
           height: 28px;
           border-radius: 7px;
-          background: var(--accent);
+          background: #1f6f5c;
           color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
-        .inbox-title {
-          font-family: Georgia, 'Iowan Old Style', serif;
+        .inbox-header-title {
+          font-family: Georgia, serif;
           font-size: 1.15rem;
-          font-weight: 600;
-          color: var(--ink);
+          font-weight: 700;
         }
 
-        .inbox-count-pill {
-          font-size: 0.6875rem;
+        .inbox-badge {
+          font-size: 0.7rem;
           font-weight: 600;
-          background: var(--accent-soft);
-          color: var(--accent);
-          padding: 0.2rem 0.6rem;
+          background: #e7f1ee;
+          color: #1f6f5c;
+          padding: 0.15rem 0.5rem;
           border-radius: 999px;
         }
 
-        .inbox-search-box {
-          background: #ffffff;
-          border-color: var(--line);
-          color: var(--ink);
+        .inbox-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
         }
 
-        .inbox-refresh-btn {
+        .inbox-search {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          background: #faf8f2;
+          border: 1px solid #e2ded0;
+          padding: 0.35rem 0.65rem;
+          border-radius: 8px;
+        }
+
+        .inbox-search input {
+          border: none;
+          background: transparent;
+          outline: none;
+          font-size: 0.8rem;
+          width: 220px;
+        }
+
+        .inbox-refresh {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
           background: #ffffff;
-          border-color: var(--line);
-          color: var(--ink-soft);
+          border: 1px solid #e2ded0;
+          border-radius: 8px;
+          padding: 0.4rem 0.75rem;
+          font-size: 0.75rem;
+          font-weight: 500;
+          color: #5b6270;
           cursor: pointer;
-          transition: border-color 0.15s, color 0.15s;
-        }
-        .inbox-refresh-btn:hover:not(:disabled) {
-          border-color: var(--accent);
-          color: var(--accent);
         }
 
-        .email-row {
-          border-color: var(--subtle);
+        .inbox-refresh:hover { border-color: #1f6f5c; color: #1f6f5c; }
+
+        .inbox-split-view {
+          flex: 1;
+          display: flex;
+          overflow: hidden;
         }
 
-        .email-row-active {
-          background: var(--accent-soft) !important;
-          border-left: 4px solid var(--accent);
+        .inbox-list-pane {
+          width: 380px;
+          background: #ffffff;
+          border-right: 1px solid #e2ded0;
+          overflow-y: auto;
+          flex-shrink: 0;
+        }
+
+        .inbox-preview-pane {
+          flex: 1;
+          background: #faf8f2;
+          overflow-y: auto;
+          padding: 1.5rem;
+        }
+
+        .email-item {
+          padding: 0.85rem 1rem;
+          border-bottom: 1px solid #eae6da;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+
+        .email-item:hover { background: #f6f4ee; }
+        .email-item.selected {
+          background: #e7f1ee !important;
+          border-left: 4px solid #1f6f5c;
+        }
+
+        .email-item-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.25rem;
+        }
+
+        .email-sender-wrap {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          overflow: hidden;
         }
 
         .unread-dot {
           width: 6px;
           height: 6px;
           border-radius: 999px;
-          background: var(--accent);
+          background: #1f6f5c;
+          flex-shrink: 0;
         }
 
-        .avatar-circle {
-          width: 34px;
-          height: 34px;
-          border-radius: 999px;
-          background: var(--accent);
-          color: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
+        .email-sender-name {
           font-size: 0.8125rem;
+          font-weight: 600;
+          color: #24261f;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .status-pill {
+        .email-item.unread .email-sender-name {
+          font-weight: 700;
+        }
+
+        .email-item-date {
+          font-size: 0.6875rem;
+          color: #9ea194;
+          white-space: nowrap;
+        }
+
+        .email-item-subject {
+          font-size: 0.78125rem;
+          font-weight: 500;
+          color: #3b4035;
+          margin-bottom: 0.25rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .email-item-snippet {
+          font-size: 0.72rem;
+          color: #7f8677;
+          line-height: 1.35;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .email-full-card {
+          background: #ffffff;
+          border: 1px solid #e2ded0;
+          border-radius: 14px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+
+        .email-full-header {
+          padding: 1.5rem;
+          border-bottom: 1px solid #e2ded0;
+          background: #fff;
+        }
+
+        .verified-pill {
           display: inline-flex;
           align-items: center;
           gap: 0.35rem;
           background: #eaf5ee;
           color: #2f7d52;
-          font-size: 0.6875rem;
+          font-size: 0.7rem;
           font-weight: 600;
-          padding: 0.2rem 0.55rem;
+          padding: 0.2rem 0.5rem;
           border-radius: 999px;
+          margin-bottom: 0.75rem;
         }
 
-        .email-body-paper {
-          border-color: var(--line);
+        .email-full-subject {
+          font-family: Georgia, serif;
+          font-size: 1.35rem;
+          font-weight: 700;
+          margin-bottom: 1rem;
+          color: #24261f;
         }
 
-        .email-prose {
-          line-height: 1.8;
+        .email-meta-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-top: 1rem;
+          border-top: 1px solid #eae6da;
+        }
+
+        .email-sender-info {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+        }
+
+        .avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 999px;
+          background: #1f6f5c;
+          color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 0.85rem;
+        }
+
+        .sender-name-full {
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: #24261f;
+        }
+
+        .sender-name-full span {
+          font-size: 0.75rem;
+          font-weight: 400;
+          color: #7f8677;
+        }
+
+        .sender-sub {
+          font-size: 0.6875rem;
+          color: #9ea194;
+        }
+
+        .email-date-pill {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          background: #faf8f2;
+          border: 1px solid #e2ded0;
+          padding: 0.35rem 0.65rem;
+          border-radius: 8px;
+          font-size: 0.75rem;
+          color: #5b6270;
+        }
+
+        .email-full-body {
+          padding: 1.75rem;
+        }
+
+        .email-body-text {
+          font-family: Georgia, serif;
           font-size: 0.9375rem;
+          line-height: 1.8;
+          color: #24261f;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+
+        .inbox-state-msg {
+          height: 250px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          color: #7f8677;
+          font-size: 0.8rem;
+        }
+
+        .inbox-error-box {
+          margin: 1rem;
+          padding: 0.75rem;
+          background: #fbece8;
+          color: #b73822;
+          border-radius: 8px;
+          font-size: 0.75rem;
+          display: flex;
+          gap: 0.5rem;
+        }
+
+        .spin {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

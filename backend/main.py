@@ -1,15 +1,18 @@
+"""Main FastAPI application for SmartMail AI assistant."""
+
 import os
 import smtplib
 from typing import List
 
 from dotenv import load_dotenv
+from email_reader import fetch_inbox_emails
 from email_sender import send_email_service
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
-from email_reader import fetch_inbox_emails
+
 load_dotenv()
 
 app = FastAPI(title="SmartMail AI API")
@@ -23,16 +26,16 @@ app.add_middleware(
 )
 
 
-# --------------------------------------------------
-# Email Generation
-# --------------------------------------------------
 class EmailRequest(BaseModel):
+    """Schema for incoming email generation request."""
+
     subject: str
     short_description: str
     contact_details: str = ""
 
 
 def get_client():
+    """Initialize and return the Google Gemini client."""
     api_key = os.getenv("GEMINIAI_API_KEY")
     if not api_key:
         raise ValueError("GEMINIAI_API_KEY environment variable set nahi hai.")
@@ -82,6 +85,7 @@ Instructions:
 def generate_email_service(
     subject: str, short_description: str, contact_details: str
 ) -> str:
+    """Generate professional email draft using Gemini AI."""
     client = get_client()
 
     prompt = EMAIL_PROMPT_TEMPLATE.format(
@@ -97,11 +101,12 @@ def generate_email_service(
         )
         return response.text
     except Exception as e:
-        raise RuntimeError(f"Gemini API error: {str(e)}")
+        raise RuntimeError(f"Gemini API error: {str(e)}") from e
 
 
 @app.post("/api/generate-email")
 def generate_email_endpoint(data: EmailRequest):
+    """Endpoint to generate an email body from prompt description."""
     try:
         email_body = generate_email_service(
             subject=data.subject,
@@ -110,12 +115,9 @@ def generate_email_endpoint(data: EmailRequest):
         )
         return {"success": True, "email": email_body}
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        raise HTTPException(status_code=500, detail=str(err)) from err
 
 
-# --------------------------------------------------
-# Email Sending
-# --------------------------------------------------
 @app.post("/api/send-email")
 async def send_email_endpoint(
     to: str = Form(...),
@@ -123,6 +125,7 @@ async def send_email_endpoint(
     body: str = Form(...),
     attachments: List[UploadFile] = File(default=[]),
 ):
+    """Endpoint to dispatch email with attachments via SMTP."""
     try:
         files_data = []
         for f in attachments:
@@ -139,22 +142,24 @@ async def send_email_endpoint(
         )
         return {"success": True}
     except ValueError as err:
-        raise HTTPException(status_code=500, detail=str(err))
-    except smtplib.SMTPAuthenticationError:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+    except smtplib.SMTPAuthenticationError as exc:
         raise HTTPException(
             status_code=502,
             detail="Gmail login fail hua. Kripya apna 16-character App Password check karein.",
-        )
+        ) from exc
     except smtplib.SMTPException as err:
-        raise HTTPException(status_code=502, detail=f"SMTP error: {err}")
+        raise HTTPException(status_code=502, detail=f"SMTP error: {err}") from err
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        raise HTTPException(status_code=500, detail=str(err)) from err
 
 
 @app.get("/api/emails/inbox")
 async def get_inbox_emails(limit: int = 10):
-  try:
-    emails = await run_in_threadpool(fetch_inbox_emails, limit=limit)
-    return {"success": True, "emails": emails}
-  except Exception as err:
-    raise HTTPException(status_code=500, detail=str(err))
+    """Endpoint to fetch latest emails from inbox."""
+    try:
+        emails = await run_in_threadpool(fetch_inbox_emails, limit=limit)
+        return {"success": True, "emails": emails}
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+    
