@@ -19,7 +19,7 @@ const API_BASE_URL = 'http://localhost:8000';
 const GENERATE_EMAIL_ENDPOINT = `${API_BASE_URL}/api/generate-email`;
 const SEND_EMAIL_ENDPOINT = `${API_BASE_URL}/api/send-email`;
 
-export default function EmailGenerator({ initialData }) {
+export default function EmailGenerator({ user, initialData }) {
   const [formData, setFormData] = useState({
     receiver: '',
     subject: '',
@@ -153,12 +153,18 @@ export default function EmailGenerator({ initialData }) {
 
   const handleSendEmail = async () => {
     if (!preview.to.trim() || !preview.body.trim()) return;
+    if (!user?.email || !user?.password) {
+      setSendErrorMessage('User session expired. Please log in again.');
+      setSendStatus('error');
+      return;
+    }
 
-    setSendStatus('sending');
-    setSendErrorMessage('');
+    setIsSendingState();
 
     try {
       const form = new FormData();
+      form.append('sender_email', user.email.trim());
+      form.append('sender_app_password', user.password.replace(/\s+/g, ''));
       form.append('to', preview.to.trim());
       form.append('subject', preview.subject.trim());
       form.append('body', preview.body);
@@ -186,6 +192,11 @@ export default function EmailGenerator({ initialData }) {
       );
       setSendStatus('error');
     }
+  };
+
+  const setIsSendingState = () => {
+    setSendStatus('sending');
+    setSendErrorMessage('');
   };
 
   return (
@@ -319,7 +330,6 @@ export default function EmailGenerator({ initialData }) {
           .sm-panels { grid-template-columns: minmax(0, 380px) 1fr; }
         }
 
-        /* Compose Panel */
         .sm-compose {
           background: var(--surface-2);
           border-bottom: 1px solid var(--line);
@@ -454,7 +464,6 @@ export default function EmailGenerator({ initialData }) {
           cursor: not-allowed;
         }
 
-        /* Preview Panel */
         .sm-preview-col {
           display: flex;
           flex-direction: column;
@@ -671,7 +680,6 @@ export default function EmailGenerator({ initialData }) {
           background: var(--error-bg);
         }
 
-        /* Toolbar */
         .sm-letter-toolbar {
           display: flex;
           flex-wrap: wrap;

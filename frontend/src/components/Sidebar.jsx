@@ -1,10 +1,9 @@
 import React from 'react';
-import { Send, Inbox, Mail, Settings, Feather } from 'lucide-react';
+import { Send, Inbox, LogOut, Feather, User } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab }) {
+export default function Sidebar({ activeTab, setActiveTab, userEmail, onLogout }) {
   return (
     <aside className="sm-sidebar">
-      {/* Top Branding */}
       <div>
         <div className="sm-sidebar-brand">
           <span className="sm-sidebar-logo">
@@ -16,7 +15,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           </div>
         </div>
 
-        {/* Navigation items */}
+        {/* Logged in User Profile indicator */}
+        <div className="sm-user-badge">
+          <User size={13} className="text-[#1f6f5c]" />
+          <span title={userEmail}>{userEmail}</span>
+        </div>
+
         <nav className="sm-sidebar-nav">
           <button
             type="button"
@@ -38,11 +42,10 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         </nav>
       </div>
 
-      {/* Bottom Settings */}
       <div className="sm-sidebar-footer">
-        <button type="button" className="sm-footer-btn">
-          <Settings size={15} strokeWidth={1.8} />
-          <span>Settings</span>
+        <button type="button" onClick={onLogout} className="sm-footer-btn logout">
+          <LogOut size={15} strokeWidth={1.8} />
+          <span>Log out</span>
         </button>
       </div>
 
@@ -68,9 +71,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           display: flex;
           align-items: center;
           gap: 0.65rem;
-          padding: 0.35rem 0.5rem 1.4rem;
+          padding: 0.35rem 0.5rem 1rem;
           border-bottom: 1px solid #262e28;
-          margin-bottom: 1rem;
+          margin-bottom: 0.75rem;
         }
 
         .sm-sidebar-logo {
@@ -91,7 +94,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           font-weight: 700;
           color: #f5f3ec;
           line-height: 1.15;
-          letter-spacing: 0.01em;
           margin: 0;
         }
 
@@ -101,6 +103,26 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           letter-spacing: 0.08em;
           color: #7f8a82;
           margin: 0.15rem 0 0;
+        }
+
+        .sm-user-badge {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          background: #202722;
+          border: 1px solid #28322b;
+          padding: 0.4rem 0.6rem;
+          border-radius: 7px;
+          font-size: 0.7rem;
+          color: #d1d8d3;
+          margin-bottom: 1rem;
+          overflow: hidden;
+        }
+
+        .sm-user-badge span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .sm-sidebar-nav {
@@ -124,7 +146,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           cursor: pointer;
           transition: all 0.15s ease;
           text-align: left;
-          box-sizing: border-box;
         }
 
         .sm-nav-btn:hover {
@@ -136,7 +157,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           background: #1f6f5c;
           color: #ffffff;
           font-weight: 600;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .sm-sidebar-footer {
@@ -159,9 +179,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           transition: all 0.15s ease;
         }
 
-        .sm-footer-btn:hover {
-          background: #202722;
-          color: #d1d8d3;
+        .sm-footer-btn.logout:hover {
+          background: #331f1d;
+          color: #f1a396;
         }
       `}</style>
     </aside>

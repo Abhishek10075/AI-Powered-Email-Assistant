@@ -20,7 +20,7 @@ import {
 const API_BASE_URL = 'http://localhost:8000';
 const INBOX_ENDPOINT = `${API_BASE_URL}/api/emails/inbox?limit=15`;
 
-export default function Inbox({ onComposeAction }) {
+export default function Inbox({ user, onComposeAction }) {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,13 +30,23 @@ export default function Inbox({ onComposeAction }) {
   const [deletingId, setDeletingId] = useState(null);
 
   const fetchInbox = async () => {
+    if (!user?.email || !user?.password) return;
+
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(INBOX_ENDPOINT);
+      const res = await fetch(INBOX_ENDPOINT, {
+        headers: {
+          'x-user-email': user.email,
+          'x-user-password': user.password,
+        },
+      });
+
       if (!res.ok) {
-        throw new Error(`Failed to load inbox (${res.status})`);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.detail || `Failed to load inbox (${res.status})`);
       }
+
       const data = await res.json();
       const list = Array.isArray(data?.emails) ? data.emails : [];
       setEmails(list);
@@ -54,7 +64,7 @@ export default function Inbox({ onComposeAction }) {
 
   useEffect(() => {
     fetchInbox();
-  }, []);
+  }, [user]);
 
   const handleSelectEmail = (id) => {
     setSelectedId(id);
@@ -62,13 +72,17 @@ export default function Inbox({ onComposeAction }) {
   };
 
   const handleDeleteEmail = async (e, id) => {
-    e.stopPropagation(); // Parent click prevent karein
+    e.stopPropagation();
     if (deletingId) return;
 
     setDeletingId(id);
     try {
       const res = await fetch(`${API_BASE_URL}/api/emails/inbox/${id}`, {
         method: 'DELETE',
+        headers: {
+          'x-user-email': user.email,
+          'x-user-password': user.password,
+        },
       });
 
       if (!res.ok) {
@@ -255,7 +269,6 @@ export default function Inbox({ onComposeAction }) {
                     {hasAtt && <Paperclip size={11} className="text-[#1f6f5c]" />}
                     <span className="email-item-date">{formatDate(item.date)}</span>
 
-                    {/* Delete Action on Hover */}
                     <button
                       type="button"
                       disabled={isDeleting}
@@ -291,7 +304,6 @@ export default function Inbox({ onComposeAction }) {
                     <Sparkles size={12} /> Gmail Verified
                   </span>
 
-                  {/* Header Delete Action */}
                   <button
                     type="button"
                     disabled={deletingId === selectedEmail.id}
@@ -330,10 +342,8 @@ export default function Inbox({ onComposeAction }) {
               </div>
 
               <div className="email-full-body">
-                {/* Text Body */}
                 <div className="email-body-text">{selectedEmail.body}</div>
 
-                {/* Attachments Section */}
                 {receivedAttachments.length > 0 && (
                   <div className="inbox-attachments-section">
                     <div className="inbox-att-title">
@@ -371,7 +381,6 @@ export default function Inbox({ onComposeAction }) {
                   </div>
                 )}
 
-                {/* Reply and Forward Action Bar */}
                 <div className="inbox-actions-bar">
                   <button
                     type="button"

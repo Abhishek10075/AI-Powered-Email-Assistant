@@ -1,10 +1,9 @@
-"""Email reading, HTML sanitizing, and attachment extraction for SmartMail AI."""
+"""Email reading, HTML sanitizing, and attachment extraction using dynamic credentials."""
 
 import base64
 from email import policy
 from email.parser import BytesParser
 import imaplib
-import os
 from bs4 import BeautifulSoup
 
 IMAP_SERVER = "imap.gmail.com"
@@ -24,18 +23,28 @@ def clean_html_to_text(html_content: str) -> str:
         return html_content
 
 
-def fetch_inbox_emails(limit: int = 15):
-    """Fetch latest emails along with their metadata and attachments."""
-    sender_email = os.getenv("SENDER_EMAIL")
-    sender_app_password = os.getenv("SENDER_APP_PASSWORD")
+def verify_user_credentials(user_email: str, user_app_password: str) -> bool:
+    """Test login to Gmail IMAP to verify user credentials."""
+    clean_email = user_email.strip()
+    clean_password = "".join(user_app_password.split())
 
-    if not sender_email or not sender_app_password:
-        raise ValueError("SENDER_EMAIL ya SENDER_APP_PASSWORD missing hai.")
+    with imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT) as mail:
+        mail.login(clean_email, clean_password)
+    return True
+
+
+def fetch_inbox_emails(user_email: str, user_app_password: str, limit: int = 15):
+    """Fetch latest emails along with metadata and attachments using user credentials."""
+    clean_email = user_email.strip()
+    clean_password = "".join(user_app_password.split())
+
+    if not clean_email or not clean_password:
+        raise ValueError("User email and App Password are required.")
 
     emails_list = []
 
     with imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT) as mail:
-        mail.login(sender_email, sender_app_password)
+        mail.login(clean_email, clean_password)
         mail.select("INBOX")
 
         status, messages = mail.search(None, "ALL")
@@ -68,7 +77,6 @@ def fetch_inbox_emails(limit: int = 15):
                     content_disposition = str(part.get("Content-Disposition", ""))
                     filename = part.get_filename()
 
-                    # Check agar yeh part attachment hai
                     if "attachment" in content_disposition or filename:
                         payload_bytes = part.get_payload(decode=True)
                         if payload_bytes:
@@ -78,11 +86,10 @@ def fetch_inbox_emails(limit: int = 15):
                                 "filename": clean_filename,
                                 "content_type": content_type,
                                 "size": len(payload_bytes),
-                                "data": f"data:{content_type};base64,{encoded_data}"
+                                "data": f"data:{content_type};base64,{encoded_data}",
                             })
                         continue
 
-                    # Text body extract karein
                     if content_type == "text/plain" and not body_text:
                         payload = part.get_payload(decode=True)
                         if payload:
@@ -109,7 +116,6 @@ def fetch_inbox_emails(limit: int = 15):
                     else:
                         body_text = decoded
 
-            # HTML clean fallback
             if not body_text and html_fallback:
                 body_text = clean_html_to_text(html_fallback)
             elif body_text and "<html" in body_text.lower():
@@ -126,22 +132,17 @@ def fetch_inbox_emails(limit: int = 15):
 
     return emails_list
 
-def delete_inbox_email(email_id: str):
-    """Mark an email as deleted and expunge it from the Gmail inbox."""
-    sender_email = os.getenv("SENDER_EMAIL")
-    sender_app_password = os.getenv("SENDER_APP_PASSWORD")
 
-    if not sender_email or not sender_app_password:
-        raise ValueError("SENDER_EMAIL ya SENDER_APP_PASSWORD missing hai.")
+def delete_inbox_email(user_email: str, user_app_password: str, email_id: str):
+    """Mark an email as deleted and expunge it from the user's inbox."""
+    clean_email = user_email.strip()
+    clean_password = "".join(user_app_password.split())
 
     with imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT) as mail:
-        mail.login(sender_email, sender_app_password)
+        mail.login(clean_email, clean_password)
         mail.select("INBOX")
-
-        # Mark message with Deleted flag and expunge
         status, _ = mail.store(email_id, "+FLAGS", "\\Deleted")
         if status != "OK":
-            raise RuntimeError(f"Failed to flag email ID {email_id} as deleted.")
-
+            raise RuntimeError(f"Failed to delete email ID {email_id}.")
         mail.expunge()
     return True
